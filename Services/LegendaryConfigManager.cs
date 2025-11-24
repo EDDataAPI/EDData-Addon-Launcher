@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Serilog;
 
 namespace Elite_Dangerous_Addon_Launcher_V2.Services
 {
@@ -43,65 +44,79 @@ namespace Elite_Dangerous_Addon_Launcher_V2.Services
 
         public static void EnsureLegendaryConfig()
         {
-            var configDir = Path.GetDirectoryName(ConfigPath);
-            if (!Directory.Exists(configDir))
-                Directory.CreateDirectory(configDir);
-
-            List<string> lines = File.Exists(ConfigPath)
-                ? File.ReadAllLines(ConfigPath).ToList()
-                : new List<string>();
-
-            bool aliasSectionExists = lines.Any(l => l.Trim().Equals(AliasSection, StringComparison.OrdinalIgnoreCase));
-            bool aliasExists = lines.Any(l => l.Trim().Equals($"{GameAlias} = {GameId}", StringComparison.OrdinalIgnoreCase));
-            bool gameSectionExists = lines.Any(l => l.Trim().Equals(GameSection, StringComparison.OrdinalIgnoreCase));
-            bool hasStartParams = lines.Any(l => l.Trim().StartsWith("start_params"));
-
-            if (!aliasSectionExists)
+            try
             {
-                lines.Add("");
-                lines.Add(AliasSection);
-            }
+                var configDir = Path.GetDirectoryName(ConfigPath);
+                if (!Directory.Exists(configDir))
+                    Directory.CreateDirectory(configDir);
 
-            if (!aliasExists)
+                List<string> lines = File.Exists(ConfigPath)
+                    ? File.ReadAllLines(ConfigPath).ToList()
+                    : new List<string>();
+
+                bool aliasSectionExists = lines.Any(l => l.Trim().Equals(AliasSection, StringComparison.OrdinalIgnoreCase));
+                bool aliasExists = lines.Any(l => l.Trim().Equals($"{GameAlias} = {GameId}", StringComparison.OrdinalIgnoreCase));
+                bool gameSectionExists = lines.Any(l => l.Trim().Equals(GameSection, StringComparison.OrdinalIgnoreCase));
+                bool hasStartParams = lines.Any(l => l.Trim().StartsWith("start_params"));
+
+                if (!aliasSectionExists)
+                {
+                    lines.Add("");
+                    lines.Add(AliasSection);
+                }
+
+                if (!aliasExists)
+                {
+                    int aliasIndex = lines.FindIndex(l => l.Trim().Equals(AliasSection));
+                    lines.Insert(aliasIndex + 1, $"{GameAlias} = {GameId}");
+                }
+
+                if (!gameSectionExists)
+                {
+                    lines.Add("");
+                    lines.Add(GameSection);
+                }
+
+                if (!hasStartParams)
+                {
+                    int sectionIndex = lines.FindIndex(l => l.Trim().Equals(GameSection));
+                    lines.Insert(sectionIndex + 1, $"start_params = {DefaultParams}");
+                }
+
+                File.WriteAllLines(ConfigPath, lines);
+            }
+            catch (Exception ex)
             {
-                int aliasIndex = lines.FindIndex(l => l.Trim().Equals(AliasSection));
-                lines.Insert(aliasIndex + 1, $"{GameAlias} = {GameId}");
+                Log.Error(ex, "Error ensuring Legendary configuration");
             }
-
-            if (!gameSectionExists)
-            {
-                lines.Add("");
-                lines.Add(GameSection);
-            }
-
-            if (!hasStartParams)
-            {
-                int sectionIndex = lines.FindIndex(l => l.Trim().Equals(GameSection));
-                lines.Insert(sectionIndex + 1, $"start_params = {DefaultParams}");
-            }
-
-            File.WriteAllLines(ConfigPath, lines);
         }
 
         public static void UpdateStartParams(string newParams)
         {
-            if (!File.Exists(ConfigPath)) return;
-
-            var lines = File.ReadAllLines(ConfigPath).ToList();
-            int sectionIndex = lines.FindIndex(l => l.Trim().Equals(GameSection));
-            if (sectionIndex < 0) return;
-
-            int paramLineIndex = lines.FindIndex(sectionIndex + 1, l => l.Trim().StartsWith("start_params"));
-            if (paramLineIndex >= 0)
+            try
             {
-                lines[paramLineIndex] = $"start_params = {newParams}";
-            }
-            else
-            {
-                lines.Insert(sectionIndex + 1, $"start_params = {newParams}");
-            }
+                if (!File.Exists(ConfigPath)) return;
 
-            File.WriteAllLines(ConfigPath, lines);
+                var lines = File.ReadAllLines(ConfigPath).ToList();
+                int sectionIndex = lines.FindIndex(l => l.Trim().Equals(GameSection));
+                if (sectionIndex < 0) return;
+
+                int paramLineIndex = lines.FindIndex(sectionIndex + 1, l => l.Trim().StartsWith("start_params"));
+                if (paramLineIndex >= 0)
+                {
+                    lines[paramLineIndex] = $"start_params = {newParams}";
+                }
+                else
+                {
+                    lines.Insert(sectionIndex + 1, $"start_params = {newParams}");
+                }
+
+                File.WriteAllLines(ConfigPath, lines);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error updating start parameters");
+            }
         }
     }
 }

@@ -23,12 +23,12 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             {
                 string arg = e.Args[i];
                 // process arguments
-                if (arg.StartsWith("/profile="))
+                if (arg.StartsWith(AppConstants.ProfileArgumentPrefix))
                 {
-                    App.ProfileName = arg.Substring("/profile=".Length);
+                    App.ProfileName = arg.Substring(AppConstants.ProfileArgumentPrefix.Length);
                     // Now App.ProfileName contains the profile name passed as argument
                 }
-                else if (arg.Equals("/autolaunch"))
+                else if (arg.Equals(AppConstants.AutoLaunchArgument))
                 {
                     // The /autolaunch argument was passed
                     App.AutoLaunch = true;

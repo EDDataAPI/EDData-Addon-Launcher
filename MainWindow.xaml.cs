@@ -26,17 +26,13 @@ namespace Elite_Dangerous_Addon_Launcher_V2
     {
         #region Private Fields
 
-        public List<string> processList = new List<string>();
+        private readonly object _processListLock = new object();
+        private List<string> processList = new List<string>();
 
-        private string _applicationVersion;
         private bool _isChecking = false;
         private string _appVersion;
         private bool _isLoading = true;
-        // The row that will be dragged.
-        private DataGridRow _rowToDrag;
         private string logpath;
-        // Store the position where the mouse button is clicked.
-        private Point _startPoint;
 
         private bool isDarkTheme = false;
         private SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
@@ -156,7 +152,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             try
             {
                 string localFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string filePath = Path.Combine(localFolder, "profiles.json");
+                string filePath = Path.Combine(localFolder, AppConstants.ProfilesFileName);
 
                 if (File.Exists(filePath))
                 {
@@ -195,7 +191,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             }
             catch (Exception ex)
             {
-                // Handle other exceptions
+                Log.Error(ex, "Error loading profiles");
             }
         }
 
@@ -205,7 +201,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             var profilesJson = JsonConvert.SerializeObject(AppState.Instance.Profiles);
 
             // Create a file called "profiles.json" in the local folder
-            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "profiles.json");
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppConstants.ProfilesFileName);
 
             // Write the JSON string to the file
             await File.WriteAllTextAsync(path, profilesJson);
@@ -349,7 +345,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
                 AppState.Instance.CurrentProfile = newProfile;
 
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
                 UpdateDataGrid();
             }
         }
@@ -388,7 +384,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         AppState.Instance.CurrentProfile = null;
                     }
 
-                    _ = SaveProfilesAsync();
+                    _ = SaveProfilesAsync().ConfigureAwait(false);
                     UpdateDataGrid();
                 }
             }
@@ -403,7 +399,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             {
                 string exePath = Path.Combine(appToEdit.Path, appToEdit.ExeName);
 
-                if (appToEdit.ExeName.Equals("edlaunch.exe", StringComparison.OrdinalIgnoreCase)
+                if (appToEdit.ExeName.Equals(AppConstants.EdLaunchExe, StringComparison.OrdinalIgnoreCase)
                     && IsEpicInstalled(exePath))
                 {
                     // Open Legendary settings window instead of AddApp
@@ -485,16 +481,22 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
 
 
-        private void Btn_Launch_Click(object sender, RoutedEventArgs e)
+        private async void Btn_Launch_Click(object sender, RoutedEventArgs e)
         {
             // Code to launch all enabled apps
+            if (AppState.Instance.CurrentProfile?.Apps == null)
+            {
+                Log.Warning("No profile or apps available");
+                return;
+            }
+
             Log.Information("Launching all enabled apps..");
             foreach (var app in AppState.Instance.CurrentProfile.Apps)
             {
                 if (app.IsEnabled)
                 {
                     Btn_Launch.IsEnabled = false;
-                    LaunchApp(app);
+                    await LaunchApp(app);
                     Log.Information("Launching {AppName}..", app.Name);
                 }
             }
@@ -522,14 +524,14 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         }
 
 
-        private void CheckBox_Unchecked(object sender, RoutedEventArgs e)  // this is the checkbox fo r the defaul profile
+        private void CheckBox_Unchecked(object sender, RoutedEventArgs e)  // This is the checkbox for the default profile
         {
             var checkBox = (CheckBox)sender;
             var app = (MyApp)checkBox.Tag;
             if (app != null)
             {
                 app.IsEnabled = false;
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
             }
         }
 
@@ -571,7 +573,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     previouslyDefaultProfile.IsDefault = false;
                 }
                 selectedProfile.IsDefault = true;
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
             }
         }
 
@@ -601,17 +603,17 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     // handle exception
                     Log.Error(ex, "An error occurred trying to delete an app..");
                 }
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
             }
         }
 
-        private void LaunchApp(MyApp app)
+        private async Task LaunchApp(MyApp app)
         {
             string args;
             const string quote = "\"";
             var path = $"{app.Path}/{app.ExeName}";
 
-            if (string.Equals(app.ExeName, "targetgui.exe", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(app.ExeName, AppConstants.TargetGuiExe, StringComparison.OrdinalIgnoreCase))
             {
                 args = "-r " + quote + app.Args + quote;
             }
@@ -661,7 +663,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             {
                 try
                 {
-                    if (string.Equals(app.ExeName, "edlaunch.exe", StringComparison.OrdinalIgnoreCase) &&
+                    if (string.Equals(app.ExeName, AppConstants.EdLaunchExe, StringComparison.OrdinalIgnoreCase) &&
                         IsEpicInstalled(path))
                     {
                         if (!IsLegendaryInstalled())
@@ -689,7 +691,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         Debug.WriteLine("Legendary errors:\n" + error);
 
                         // Start a watcher for EDLaunch process
-                        Task.Run(() =>
+                        _ = Task.Run(async () =>
                         {
                             const int maxRetries = 20;
                             int retries = 0;
@@ -708,10 +710,10 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                                     break;
                                 }
 
-                                Thread.Sleep(500);
+                                await Task.Delay(500);
                                 retries++;
                             }
-                        });
+                        }).ConfigureAwait(false);
 
                         UpdateStatus($"Launching {app.Name} (Epic) via Legendary...");
                         this.WindowState = WindowState.Minimized;
@@ -735,7 +737,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         proc.Exited += new EventHandler(ProcessExitHandler);
                     }
 
-                    Thread.Sleep(50);
+                    await Task.Delay(50);
                     proc.Refresh();
                 }
                 catch (Exception ex)
@@ -752,12 +754,18 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
                     if (target.Equals("steam://rungameid/359320", StringComparison.OrdinalIgnoreCase))
                     {
-                        Thread.Sleep(2000);
-                        var edLaunchProc = Process.GetProcessesByName("EDLaunch").FirstOrDefault();
-                        if (edLaunchProc != null)
+                        // Wait for EDLaunch process to start (with timeout)
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        while (sw.ElapsedMilliseconds < 5000)
                         {
-                            edLaunchProc.EnableRaisingEvents = true;
-                            edLaunchProc.Exited += new EventHandler(ProcessExitHandler);
+                            var edLaunchProc = Process.GetProcessesByName("EDLaunch").FirstOrDefault();
+                            if (edLaunchProc != null)
+                            {
+                                edLaunchProc.EnableRaisingEvents = true;
+                                edLaunchProc.Exited += new EventHandler(ProcessExitHandler);
+                                break;
+                            }
+                            await Task.Delay(100);
                         }
                     }
 
@@ -809,11 +817,16 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             {
                 string json = await File.ReadAllTextAsync(settingsFilePath);
                 settings = JsonConvert.DeserializeObject<Settings>(json);
+                if (settings == null)
+                {
+                    settings = new Settings { Theme = AppConstants.DefaultTheme };
+                    Log.Warning("Settings file invalid, using defaults");
+                }
             }
             else
             {
                 // If the settings file doesn't exist, use defaults
-                settings = new Settings { Theme = "Default" };
+                settings = new Settings { Theme = "Light" };
             }
             Log.Information("Settings loaded: {Settings}", settings);
             return settings;
@@ -834,7 +847,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
                 // If this is not Elite Dangerous (which would keep the button disabled),
                 // re-enable the launch button
-                if (!appToLaunch.ExeName.Equals("edlaunch.exe", StringComparison.OrdinalIgnoreCase) &&
+                if (!appToLaunch.ExeName.Equals(AppConstants.EdLaunchExe, StringComparison.OrdinalIgnoreCase) &&
                     !appToLaunch.WebAppURL?.Contains("rungameid/359320") == true &&
                     !appToLaunch.WebAppURL?.Contains("epic://launch") == true &&
                     !appToLaunch.WebAppURL?.Contains("legendary://launch") == true)
@@ -885,7 +898,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 {
                     if (app.IsEnabled)
                     {
-                        LaunchApp(app);
+                        _ = LaunchApp(app).ConfigureAwait(false);
                     }
                 }
             }
@@ -918,7 +931,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         {
             if (e.PropertyName == nameof(MyApp.IsEnabled) || e.PropertyName == nameof(MyApp.Order))
             {
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
             }
         }
 
@@ -931,7 +944,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
         private void ProcessExitHandler(object sender, EventArgs e)  //triggered when EDLaunch exits
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.Invoke(async () =>
             {
                 Btn_Launch.IsEnabled = true;
                 bool closeAllApps = CloseAllAppsCheckbox.IsChecked == true;
@@ -945,23 +958,18 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         foreach (string p in processList)
                         {
                             Log.Information("Closing {0}", p);
-                            foreach (string process in processList)
+                            foreach (Process proc in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(p)))
                             {
-                                Log.Information("Closing {0}", p);
-                                foreach (Process proc in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(p)))
+                                try
                                 {
-                                    try
-                                    {
-                                        proc.CloseMainWindow();
-                                        proc.WaitForExit(5000); // give it time to exit
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Log.Warning("Failed to close process {0}: {1}", p, ex.Message);
-                                    }
+                                    proc.CloseMainWindow();
+                                    proc.WaitForExit(5000); // give it time to exit
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Warning("Failed to close process {0}: {1}", p, ex.Message);
                                 }
                             }
-
                         }
                     }
                     catch
@@ -972,7 +980,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     // doesn't seem to want to kill VoiceAttack nicely..
                     try
                     {
-                        Process[] procs = Process.GetProcessesByName("VoiceAttack");
+                        Process[] procs = Process.GetProcessesByName(AppConstants.VoiceAttackProcessName);
                         foreach (var proc in procs) { proc.Kill(); }        //sadly this means next time it starts, it will complain it was shutdown in an unclean fashion
                     }
                     catch
@@ -983,18 +991,15 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     // multiple running processes..
                     try
                     {
-                        Process[] procs = Process.GetProcessesByName("Elite Dangerous Odyssey Materials Helper");
+                        Process[] procs = Process.GetProcessesByName(AppConstants.EliteDangerousOdysseyHelperName);
                         foreach (var proc in procs) { proc.CloseMainWindow(); }
                     }
                     catch
                     {
                         // if something went wrong, don't raise an exception
                     }
-                    // sleep for 5 seconds then quit
-                    for (int i = 5; i != 0; i--)
-                    {
-                        Thread.Sleep(1000);
-                    }
+                    // delay for 5 seconds then quit (non-blocking)
+                    await Task.Delay(5000);
                     Environment.Exit(0);
                 }
             });
@@ -1083,7 +1088,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         {
             List<string> foundPaths = new List<string>();
             string targetFolder = "Elite Dangerous";
-            string targetFile = "edlaunch.exe";
+            string targetFile = AppConstants.EdLaunchExe;
             var tokenSource = new CancellationTokenSource();
             var token = tokenSource.Token;
 
@@ -1284,7 +1289,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                             };
                             AppState.Instance.Profiles.Add(newProfile);
                             AppState.Instance.CurrentProfile = newProfile; // switch to the new profile
-                            _ = SaveProfilesAsync();
+                            _ = SaveProfilesAsync().ConfigureAwait(false);
                             Cb_Profiles.SelectedItem = newProfile; // update combobox selected item
                             isUnique = true;
                         }
@@ -1321,7 +1326,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     // Change profile name
                     currentProfile.Name = dialog.NewName;
                     // need to save the settings
-                    _ = SaveProfilesAsync();
+                    _ = SaveProfilesAsync().ConfigureAwait(false);
                 }
             }
         }
@@ -1335,7 +1340,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 return;
             }
             // Check if edlaunch.exe exists in the current profile
-            if (!currentProfile.Apps.Any(a => a.ExeName.Equals("edlaunch.exe", StringComparison.OrdinalIgnoreCase)
+            if (!currentProfile.Apps.Any(a => a.ExeName.Equals(AppConstants.EdLaunchExe, StringComparison.OrdinalIgnoreCase)
                                 || a.WebAppURL?.Equals("steam://rungameid/359320", StringComparison.OrdinalIgnoreCase) == true))
             {
                 // edlaunch.exe does not exist in the current profile Prompt the user with a dialog
@@ -1355,7 +1360,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         var edlaunch = new MyApp
                         {
                             Name = "Elite Dangerous",
-                            ExeName = "edlaunch.exe",
+                            ExeName = AppConstants.EdLaunchExe,
                             Path = Path.GetDirectoryName(EdLuanchPaths[0]),
                             IsEnabled = true,
                             Order = 0
@@ -1366,7 +1371,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     else
                     {
                         MessageBox.Show(
-                            "edlaunch.exe was not found on your computer. Please add it manually.",
+                            AppConstants.EdLaunchNotFoundMessage,
                             "edlaunch.exe Not Found",
                             MessageBoxButton.OK,
                             MessageBoxImage.Error
@@ -1424,7 +1429,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
                 // Add the app to the profile
                 profile.Apps.Add(appCopy);
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
             }
             else
             {
@@ -1472,7 +1477,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 }
 
                 // save the changes
-                _ = SaveProfilesAsync();
+                _ = SaveProfilesAsync().ConfigureAwait(false);
 
                 // update the UI
                 UpdateDataGrid();

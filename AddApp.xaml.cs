@@ -28,7 +28,7 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         }
         private void Tb_AppExeName_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (Tb_AppExeName.Text == "edlaunch.exe")
+            if (Tb_AppExeName.Text == AppConstants.EdLaunchExe)
             {
                 CheckBox1.Visibility = Visibility.Visible;
                 CheckBox2.Visibility = Visibility.Visible;

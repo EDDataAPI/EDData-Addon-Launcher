@@ -4,8 +4,14 @@
     {
         #region Public Properties
 
-        public bool CloseAllAppsOnExit { get; set; }
-        public string Theme { get; set; }
+        public bool CloseAllAppsOnExit { get; set; } = false;
+
+        private string _theme = AppConstants.DefaultTheme;
+        public string Theme
+        {
+            get => _theme;
+            set => _theme = value ?? AppConstants.DefaultTheme;
+        }
 
         #endregion Public Properties
     }

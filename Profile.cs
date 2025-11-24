@@ -20,7 +20,6 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         public Profile()
         {
             Apps = new ObservableCollection<MyApp>();
-            Apps.CollectionChanged += (s, e) => OnPropertyChanged(nameof(Apps));
             DropHandler = new ProfileDropHandler(this);
         }
 
@@ -41,10 +40,28 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             {
                 if (_apps != value)
                 {
+                    // Unsubscribe from old collection
+                    if (_apps != null)
+                    {
+                        _apps.CollectionChanged -= Apps_CollectionChanged;
+                    }
+
                     _apps = value;
+
+                    // Subscribe to new collection
+                    if (_apps != null)
+                    {
+                        _apps.CollectionChanged += Apps_CollectionChanged;
+                    }
+
                     OnPropertyChanged();
                 }
             }
+        }
+
+        private void Apps_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(Apps));
         }
 
         public IDropTarget DropHandler { get; private set; }
