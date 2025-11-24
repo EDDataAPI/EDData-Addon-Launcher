@@ -29,6 +29,10 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         private readonly object _processListLock = new object();
         private List<string> processList = new List<string>();
 
+        // Cache for Epic game checks to avoid repeated manifest scans
+        private static readonly Dictionary<string, bool> _epicInstallCache = new Dictionary<string, bool>();
+        private static readonly object _epicCacheLock = new object();
+
         private bool _isChecking = false;
         private string _appVersion;
         private bool _isLoading = true;
@@ -636,7 +640,11 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                             UseShellExecute = true
                         };
 
-                        Process.Start(psi);
+                        // Use using statement for proper resource cleanup (optimization #4)
+                        using (var process = Process.Start(psi))
+                        {
+                            // Process launched
+                        }
 
                         // Attempt to track the actual ClickOnce process by expected name
                         string expectedExeName = Path.GetFileNameWithoutExtension(app.ExeName) + ".exe";
@@ -684,11 +692,14 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                             CreateNoWindow = true
                         };
 
-                        var legendaryProc = Process.Start(psi);
-                        string output = legendaryProc.StandardOutput.ReadToEnd();
-                        string error = legendaryProc.StandardError.ReadToEnd();
-                        Debug.WriteLine("Legendary output:\n" + output);
-                        Debug.WriteLine("Legendary errors:\n" + error);
+                        // Use using statement for proper resource cleanup (optimization #4)
+                        using (var legendaryProc = Process.Start(psi))
+                        {
+                            string output = legendaryProc.StandardOutput.ReadToEnd();
+                            string error = legendaryProc.StandardError.ReadToEnd();
+                            Debug.WriteLine("Legendary output:\n" + output);
+                            Debug.WriteLine("Legendary errors:\n" + error);
+                        }
 
                         // Start a watcher for EDLaunch process
                         _ = Task.Run(async () =>
@@ -750,7 +761,11 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 if (!string.IsNullOrEmpty(app.WebAppURL))
                 {
                     string target = app.WebAppURL;
-                    Process proc = Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+                    // Use using statement for proper resource cleanup (optimization #4)
+                    using (var proc = Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }))
+                    {
+                        // Web app launched
+                    }
 
                     if (target.Equals("steam://rungameid/359320", StringComparison.OrdinalIgnoreCase))
                     {
@@ -958,7 +973,9 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                         foreach (string p in processList)
                         {
                             Log.Information("Closing {0}", p);
-                            foreach (Process proc in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(p)))
+                            // Calculate once before loop (optimization #3)
+                            string processName = Path.GetFileNameWithoutExtension(p);
+                            foreach (Process proc in Process.GetProcessesByName(processName))
                             {
                                 try
                                 {
@@ -1186,14 +1203,12 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                     if (dirName.Equals(targetFolder, StringComparison.OrdinalIgnoreCase))
                     {
                         // The folder has the name we're looking for, now we just need to check if
-                        // the file is there
-                        foreach (string file in Directory.GetFiles(dir))
+                        // the file is there. Use filter parameter for efficiency (optimization #2)
+                        var files = Directory.GetFiles(dir, targetFile, SearchOption.TopDirectoryOnly);
+                        if (files.Length > 0)
                         {
-                            if (Path.GetFileName(file).Equals(targetFile, StringComparison.OrdinalIgnoreCase))
-                            {
-                                foundPaths.Add(file);
-                                return true; // File has been found
-                            }
+                            foundPaths.Add(files[0]);
+                            return true; // File has been found
                         }
                     }
 
@@ -1486,48 +1501,66 @@ namespace Elite_Dangerous_Addon_Launcher_V2
         }
         private bool IsEpicInstalled(string exePath)
         {
-            string manifestDir = @"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests";
-            if (!Directory.Exists(manifestDir))
-                return false;
-
-            string exeFileName = Path.GetFileName(exePath);
-            string exeDirectory = Path.GetDirectoryName(exePath);
-
-            foreach (var file in Directory.GetFiles(manifestDir, "*.item"))
+            // Check cache first (optimization #1)
+            lock (_epicCacheLock)
             {
-                try
+                if (_epicInstallCache.TryGetValue(exePath, out bool cached))
                 {
-                    var json = File.ReadAllText(file);
-                    var manifest = JObject.Parse(json);
-                    string launchExe = manifest["LaunchExecutable"]?.ToString();
-                    string installLocation = manifest["InstallLocation"]?.ToString();
-
-
-                    if (!string.IsNullOrEmpty(installLocation) && !string.IsNullOrEmpty(launchExe))
-                    {
-                        // Compare the full exe path
-                        string expectedFullPath = Path.Combine(installLocation, launchExe);
-
-                        if (string.Equals(Path.GetFullPath(expectedFullPath), Path.GetFullPath(exePath), StringComparison.OrdinalIgnoreCase))
-                        {
-                            return true;
-                        }
-
-                        // Or compare just folder + filename
-                        if (string.Equals(Path.GetFullPath(installLocation), Path.GetFullPath(exeDirectory), StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(launchExe, exeFileName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return true;
-                        }
-                    }
-                }
-                catch
-                {
-                    // Skip corrupt manifest
+                    return cached;
                 }
             }
 
-            return false;
+            string manifestDir = @"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests";
+            bool result = false;
+
+            if (Directory.Exists(manifestDir))
+            {
+                string exeFileName = Path.GetFileName(exePath);
+                string exeDirectory = Path.GetDirectoryName(exePath);
+
+                foreach (var file in Directory.GetFiles(manifestDir, "*.item"))
+                {
+                    try
+                    {
+                        var json = File.ReadAllText(file);
+                        var manifest = JObject.Parse(json);
+                        string launchExe = manifest["LaunchExecutable"]?.ToString();
+                        string installLocation = manifest["InstallLocation"]?.ToString();
+
+                        if (!string.IsNullOrEmpty(installLocation) && !string.IsNullOrEmpty(launchExe))
+                        {
+                            // Compare the full exe path
+                            string expectedFullPath = Path.Combine(installLocation, launchExe);
+
+                            if (string.Equals(Path.GetFullPath(expectedFullPath), Path.GetFullPath(exePath), StringComparison.OrdinalIgnoreCase))
+                            {
+                                result = true;
+                                break;
+                            }
+
+                            // Or compare just folder + filename
+                            if (string.Equals(Path.GetFullPath(installLocation), Path.GetFullPath(exeDirectory), StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(launchExe, exeFileName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                result = true;
+                                break;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Skip corrupt manifest
+                    }
+                }
+            }
+
+            // Cache the result
+            lock (_epicCacheLock)
+            {
+                _epicInstallCache[exePath] = result;
+            }
+
+            return result;
         }
 
         private void Btn_ShowLogs(object sender, RoutedEventArgs e)
@@ -1542,13 +1575,17 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 {
                     try
                     {
-                        ProcessStartInfo processStartInfo = new ProcessStartInfo
+                        var processStartInfo = new ProcessStartInfo
                         {
                             FileName = logpath,
                             UseShellExecute = true
                         };
 
-                        Process.Start(processStartInfo);
+                        // Use using statement for proper resource cleanup (optimization #4)
+                        using (Process.Start(processStartInfo))
+                        {
+                            // Log file opened in default viewer
+                        }
                     }
                     catch (Exception ex)
                     {
