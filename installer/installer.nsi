@@ -19,8 +19,12 @@ RequestExecutionLevel admin
 !define MUI_ICON "installer\icon.ico"
 !define MUI_UNICON "installer\icon.ico"
 !define MUI_HEADERIMAGE
-!define MUI_HEADERIMAGE_BITMAP "installer\header.bmp"
-!define MUI_WELCOMEFINISHPAGE_BITMAP "installer\wizard.bmp"
+!ifdef HEADER_BMP
+  !define MUI_HEADERIMAGE_BITMAP "installer\header.bmp"
+!endif
+!ifdef WIZARD_BMP
+  !define MUI_WELCOMEFINISHPAGE_BITMAP "installer\wizard.bmp"
+!endif
 
 ; ==================== Seiten ====================
 
