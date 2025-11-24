@@ -34,20 +34,39 @@ jobs:
       
       - name: Setup NSIS
         run: |
-          $nsisschachter = "$env:TEMP\nsis-3.08.zip"
+          $nsisZipPath = "$env:TEMP\nsis-3.08.zip"
           $nsisDir = "$env:TEMP\nsis-3.08"
           
           Write-Host "Downloading NSIS 3.08..."
-          Invoke-WebRequest -Uri "https://sourceforge.net/projects/nsis/files/NSIS%203/3.08/nsis-3.08.zip/download" -OutFile $nsisschachter -ErrorAction Stop
+          # Using GitHub-hosted mirror for reliability
+          $nsis_url = "https://github.com/NSIS/nsis/releases/download/v3.08/nsis-3.08.zip"
+          try {
+            Invoke-WebRequest -Uri $nsis_url -OutFile $nsisZipPath -ErrorAction Stop
+          } catch {
+            Write-Error "Failed to download NSIS: $_"
+            exit 1
+          }
           
           Write-Host "Extracting NSIS..."
-          Expand-Archive -Path $nsisschachter -DestinationPath $env:TEMP -Force
+          try {
+            Expand-Archive -Path $nsisZipPath -DestinationPath $env:TEMP -Force
+          } catch {
+            Write-Error "Failed to extract NSIS: $_"
+            exit 1
+          }
           
           Write-Host "Building installer..."
-          & "$nsisDir\makensis.exe" /V4 installer/installer.nsi
+          $makensisPath = "$nsisDir\makensis.exe"
+          if (-not (Test-Path $makensisPath)) {
+            Write-Error "makensis.exe not found at $makensisPath"
+            exit 1
+          }
+          
+          & $makensisPath /V4 installer/installer.nsi
           
           if ($LASTEXITCODE -ne 0) {
-            throw "NSIS build failed with exit code $LASTEXITCODE"
+            Write-Error "NSIS build failed with exit code $LASTEXITCODE"
+            exit 1
           }
           
           Write-Host "Installer created successfully"
