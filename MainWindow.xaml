@@ -125,32 +125,32 @@
                 </DataGrid.RowStyle>
 
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="App Name" Binding="{Binding Name}" />
-                    <DataGridTemplateColumn Header="Enabled">
+                    <DataGridTextColumn Header="App Name" Binding="{Binding Name}" Width="*" />
+                    <DataGridTemplateColumn Header="Enabled" Width="70">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Launch">
+                    <DataGridTemplateColumn Header="Launch" Width="80">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="Launch" Click="Btn_LaunchSingle_Click" CommandParameter="{Binding}" />
+                                <Button Content="Launch" Click="Btn_LaunchSingle_Click" CommandParameter="{Binding}" Width="70" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Edit">
+                    <DataGridTemplateColumn Header="Edit" Width="70">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="Edit" Click="Btn_Edit_Click" CommandParameter="{Binding}" />
+                                <Button Content="Edit" Click="Btn_Edit_Click" CommandParameter="{Binding}" Width="60" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Delete">
+                    <DataGridTemplateColumn Header="Delete" Width="80">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="Delete" Click="DeleteButton_Click"/>
+                                <Button Content="Delete" Click="DeleteButton_Click" Width="70" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>

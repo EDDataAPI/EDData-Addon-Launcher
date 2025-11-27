@@ -86,8 +86,20 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             this.Left = Properties.Settings.Default.MainWindowLocation.X;
             // Assign the event handler to the Loaded event
             this.Loaded += MainWindow_Loaded;
-            var version = Assembly.GetExecutingAssembly().GetName().Version;
-            ApplicationVersion = $"{version.Major}.{version.Minor}.{version.Build}"; // format as desired
+            // Use InformationalVersion for display (supports semantic versioning like 2.0.0-beta1)
+            var infoVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrEmpty(infoVersion))
+            {
+                // Remove git hash suffix if present (e.g., "2.0.0-beta1+abc123" -> "2.0.0-beta1")
+                var plusIndex = infoVersion.IndexOf('+');
+                ApplicationVersion = plusIndex > 0 ? infoVersion.Substring(0, plusIndex) : infoVersion;
+            }
+            else
+            {
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                ApplicationVersion = $"{version?.Major}.{version?.Minor}.{version?.Build}";
+            }
             // Set the data context to AppState instance
             this.DataContext = AppState.Instance;
             CloseAllAppsCheckbox.IsChecked = Properties.Settings.Default.CloseAllAppsOnExit;
