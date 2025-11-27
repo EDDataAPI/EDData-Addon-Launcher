@@ -27,10 +27,10 @@ jobs:
         run: dotnet --version
 
       - name: Restore dependencies
-        run: dotnet restore "Elite Dangerous Addon Launcher V2.csproj"
+        run: dotnet restore "Elite Dangerous Addon Launcher V2.csproj" --runtime win-x64
 
       - name: Build project
-        run: dotnet build "Elite Dangerous Addon Launcher V2.csproj" --configuration Release --no-restore
+        run: dotnet build "Elite Dangerous Addon Launcher V2.csproj" --configuration Release --runtime win-x64 --no-restore
 
       - name: Publish project
         run: dotnet publish "Elite Dangerous Addon Launcher V2.csproj" --configuration Release --output ./publish --self-contained true --runtime win-x64 --no-build
@@ -38,31 +38,31 @@ jobs:
       - name: Create MSIX package
         run: |
           Write-Host "Creating MSIX package..."
-          
+
           # Create package directory structure
           $packageDir = "msix-package"
           New-Item -ItemType Directory -Force -Path $packageDir
-          
+
           # Copy published files
           Copy-Item -Path "publish\*" -Destination $packageDir -Recurse -Force
-          
+
           # Copy manifest
           Copy-Item -Path "Package.appxmanifest" -Destination $packageDir -Force
-          
+
           # Copy assets
           Copy-Item -Path "Assets" -Destination $packageDir -Recurse -Force
-          
+
           # Create MSIX using makeappx
           $version = "${{ github.ref_name }}".TrimStart('v')
           $msixPath = "Elite-Dangerous-Addon-Launcher-$version.msix"
-          
+
           & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\makeappx.exe" pack /d $packageDir /p $msixPath /nv
-          
+
           if ($LASTEXITCODE -ne 0) {
             Write-Error "MSIX build failed with exit code $LASTEXITCODE"
             exit 1
           }
-          
+
           Write-Host "✓ MSIX package created: $msixPath"
 
       - name: Verify package
