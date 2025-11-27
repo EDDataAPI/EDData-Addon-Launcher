@@ -30,10 +30,10 @@ jobs:
         run: dotnet --version
 
       - name: Restore dependencies
-        run: dotnet restore "Elite Dangerous Addon Launcher V2.csproj" --runtime win-x64
+        run: dotnet restore "EDData Addon Helper.csproj" --runtime win-x64
 
       - name: Publish project
-        run: dotnet publish "Elite Dangerous Addon Launcher V2.csproj" --configuration Release --output ./publish --self-contained true --runtime win-x64
+        run: dotnet publish "EDData Addon Helper.csproj" --configuration Release --output ./publish --self-contained true --runtime win-x64
 
       - name: Install WiX Toolset
         run: |
@@ -53,7 +53,7 @@ jobs:
 
           # Generate PublishedFiles.wxs dynamically
           Write-Host "Generating file manifest..."
-          $files = Get-ChildItem -Path "$publishDir" -Recurse -File | Where-Object { $_.Name -ne "Elite Dangerous Addon Launcher V2.exe" }
+          $files = Get-ChildItem -Path "$publishDir" -Recurse -File | Where-Object { $_.Name -ne "EDData Addon Helper.exe" }
 
           # Build WiX fragment with proper subdirectory handling
           $xml = '<?xml version="1.0" encoding="UTF-8"?>' + "`n"
@@ -92,7 +92,7 @@ jobs:
           Write-Host "Generated manifest with $($files.Count) files"
 
           # Build the MSI with UI extension
-          wix build installer\Package.wxs installer\PublishedFiles.wxs -arch x64 -ext WixToolset.UI.wixext -d PublishDir="$publishDir" -out "Elite-Dangerous-Addon-Launcher-$version.msi"
+          wix build installer\Package.wxs installer\PublishedFiles.wxs -arch x64 -ext WixToolset.UI.wixext -d PublishDir="$publishDir" -out "EDData-Addon-Helper-$version.msi"
 
           if ($LASTEXITCODE -ne 0) {
             Write-Error "WiX build failed with exit code $LASTEXITCODE"
@@ -104,7 +104,7 @@ jobs:
       - name: Verify installer
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
-          $msiPath = "Elite-Dangerous-Addon-Launcher-$version.msi"
+          $msiPath = "EDData-Addon-Helper-$version.msi"
           if (-not (Test-Path $msiPath)) {
             Write-Error "MSI installer not found at $msiPath"
             exit 1
@@ -127,7 +127,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            Elite-Dangerous-Addon-Launcher-*.msi
+            EDData-Addon-Helper-*.msi
             LICENCE.md
           body_path: CHANGELOG.md
           prerelease: ${{ steps.release_type.outputs.is_prerelease == 'true' }}
@@ -139,4 +139,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: msi-installer
-          path: Elite-Dangerous-Addon-Launcher-*.msi
+          path: EDData-Addon-Helper-*.msi

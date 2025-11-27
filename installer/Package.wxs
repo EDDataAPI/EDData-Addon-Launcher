@@ -2,7 +2,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
-  <Package Name="Elite Dangerous Addon Launcher V2"
+  <Package Name="EDData Addon Helper"
            Manufacturer="EDToolbox"
            Version="!(bind.FileVersion.MainExeFile)"
            UpgradeCode="7E8F9A0B-1C2D-4E5F-A6B7-C8D9E0F1A2B3">
@@ -23,12 +23,12 @@
 
     <!-- Installation directory -->
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="Elite Dangerous Addon Launcher V2" />
+      <Directory Id="INSTALLFOLDER" Name="EDData Addon Helper" />
     </StandardDirectory>
 
     <!-- Start Menu -->
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="ApplicationProgramsFolder" Name="Elite Dangerous Addon Launcher V2" />
+      <Directory Id="ApplicationProgramsFolder" Name="EDData Addon Helper" />
     </StandardDirectory>
 
     <!-- Desktop -->
@@ -37,17 +37,17 @@
     <!-- Main executable component with shortcuts -->
     <Component Id="MainExecutable" Directory="INSTALLFOLDER">
       <File Id="MainExeFile"
-            Source="$(var.PublishDir)\Elite Dangerous Addon Launcher V2.exe"
+            Source="$(var.PublishDir)\EDData Addon Helper.exe"
             KeyPath="yes">
         <Shortcut Id="StartMenuShortcut"
                   Directory="ApplicationProgramsFolder"
-                  Name="Elite Dangerous Addon Launcher V2"
+                  Name="EDData Addon Helper"
                   Description="Launch Elite Dangerous addons"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="ProductIcon.ico" />
         <Shortcut Id="DesktopShortcut"
                   Directory="DesktopFolder"
-                  Name="Elite Dangerous Addon Launcher V2"
+                  Name="EDData Addon Helper"
                   Description="Launch Elite Dangerous addons"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="ProductIcon.ico" />
@@ -58,7 +58,7 @@
     <Component Id="ApplicationShortcutCleanup" Directory="ApplicationProgramsFolder">
       <RemoveFolder Id="CleanupShortcuts" On="uninstall" />
       <RegistryValue Root="HKCU"
-                     Key="Software\EDToolbox\Elite Dangerous Addon Launcher V2"
+                     Key="Software\EDToolbox\EDData Addon Helper"
                      Name="installed"
                      Type="integer"
                      Value="1"
