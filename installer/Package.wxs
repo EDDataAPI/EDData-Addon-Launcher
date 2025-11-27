@@ -1,84 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="Elite Dangerous Addon Launcher V2" 
-           Manufacturer="EDToolbox" 
-           Version="2.0.5.0" 
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  
+  <Package Name="Elite Dangerous Addon Launcher V2"
+           Manufacturer="EDToolbox"
+           Version="!(bind.FileVersion.MainExecutable)"
            UpgradeCode="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D">
-    
+
     <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
     
-    <Media Id="1" Cabinet="product.cab" EmbedCab="yes" />
+    <MediaTemplate EmbedCab="yes" />
 
-    <!-- Installation directory with user-selectable path -->
-    <StandardDirectory Id="ProgramFilesFolder">
+    <!-- Installation directory -->
+    <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="Elite Dangerous Addon Launcher V2" />
     </StandardDirectory>
 
-    <!-- Start Menu shortcuts -->
+    <!-- Start Menu -->
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="Elite Dangerous Addon Launcher V2" />
     </StandardDirectory>
 
-    <!-- Desktop shortcut -->
+    <!-- Desktop -->
     <StandardDirectory Id="DesktopFolder" />
 
-    <!-- Main component group with all published files -->
-    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Component Id="MainExecutable">
-        <File Source="$(var.PublishDir)\Elite Dangerous Addon Launcher V2.exe" KeyPath="yes">
-          <Shortcut Id="StartMenuShortcut"
-                    Directory="ApplicationProgramsFolder"
-                    Name="Elite Dangerous Addon Launcher V2"
-                    Description="Launch Elite Dangerous addons"
-                    WorkingDirectory="INSTALLFOLDER"
-                    Icon="ProductIcon" />
-          <Shortcut Id="DesktopShortcut"
-                    Directory="DesktopFolder"
-                    Name="Elite Dangerous Addon Launcher V2"
-                    Description="Launch Elite Dangerous addons"
-                    WorkingDirectory="INSTALLFOLDER"
-                    Icon="ProductIcon" />
-        </File>
-      </Component>
+    <!-- Main executable with shortcuts -->
+    <Component Id="MainExecutable" Directory="INSTALLFOLDER">
+      <File Id="MainExecutable" 
+            Source="$(var.PublishDir)\Elite Dangerous Addon Launcher V2.exe" 
+            KeyPath="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Elite Dangerous Addon Launcher V2"
+                  Description="Launch Elite Dangerous addons"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="ProductIcon.ico" />
+        <Shortcut Id="DesktopShortcut"
+                  Directory="DesktopFolder"
+                  Name="Elite Dangerous Addon Launcher V2"
+                  Description="Launch Elite Dangerous addons"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="ProductIcon.ico" />
+      </File>
+    </Component>
 
-      <!-- All other published files -->
-      <Component Id="AllOtherFiles">
-        <File Source="$(var.PublishDir)\*.*" />
-      </Component>
-    </ComponentGroup>
-
-    <!-- Application icon -->
-    <Icon Id="ProductIcon" SourceFile="..\elite-dangerous-icon.ico" />
-
-    <!-- License agreement -->
-    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
-
-    <!-- UI with custom install directory selection -->
-    <UI>
-      <UIRef Id="WixUI_InstallDir" />
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
-      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
-      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
-    </UI>
-    
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-
-    <!-- Feature: Main application -->
-    <Feature Id="ProductFeature" Title="Elite Dangerous Addon Launcher V2" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
-      <ComponentRef Id="ApplicationShortcut" />
-    </Feature>
-
-    <!-- Remove shortcuts on uninstall -->
-    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder">
+    <!-- Cleanup shortcuts on uninstall -->
+    <Component Id="ApplicationShortcutCleanup" Directory="ApplicationProgramsFolder">
       <RemoveFolder Id="CleanupShortcuts" On="uninstall" />
-      <RegistryValue Root="HKCU" 
-                     Key="Software\EDToolbox\Elite Dangerous Addon Launcher V2" 
-                     Name="installed" 
-                     Type="integer" 
-                     Value="1" 
+      <RegistryValue Root="HKCU"
+                     Key="Software\EDToolbox\Elite Dangerous Addon Launcher V2"
+                     Name="installed"
+                     Type="integer"
+                     Value="1"
                      KeyPath="yes" />
     </Component>
+
+    <!-- Application icon -->
+    <Icon Id="ProductIcon.ico" SourceFile="elite-dangerous-icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico" />
+
+    <!-- License -->
+    <WixVariable Id="WixUILicenseRtf" Value="installer\License.rtf" />
+
+    <!-- UI -->
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <!-- Feature -->
+    <Feature Id="Complete" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ApplicationShortcutCleanup" />
+    </Feature>
 
   </Package>
 </Wix>
