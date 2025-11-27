@@ -58,7 +58,7 @@ jobs:
           Write-Host "Generating file manifest..."
           $files = Get-ChildItem -Path "$publishDir" -Recurse -File | Where-Object { $_.Name -ne "Elite Dangerous Addon Launcher V2.exe" }
 
-          # Build WiX fragment
+          # Build WiX fragment with proper subdirectory handling
           $xml = '<?xml version="1.0" encoding="UTF-8"?>' + "`n"
           $xml += '<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">' + "`n"
           $xml += '  <Fragment>' + "`n"
@@ -67,9 +67,23 @@ jobs:
           $componentId = 1
           foreach ($file in $files) {
             $relativePath = $file.FullName.Substring($publishDir.Length + 1)
-            $xml += "      <Component Id=`"Comp_$componentId`">`n"
-            $xml += "        <File Source=`"`$(var.PublishDir)\$relativePath`" />`n"
-            $xml += "      </Component>`n"
+            $subDir = [System.IO.Path]::GetDirectoryName($relativePath)
+            
+            # Sanitize component ID (replace invalid chars)
+            $safeId = "Comp_$componentId"
+            
+            if ([string]::IsNullOrEmpty($subDir)) {
+              # File in root directory
+              $xml += "      <Component Id=`"$safeId`" Guid=`"*`">`n"
+              $xml += "        <File Source=`"`$(var.PublishDir)\$relativePath`" />`n"
+              $xml += "      </Component>`n"
+            } else {
+              # File in subdirectory - use Subdirectory attribute
+              $subDirClean = $subDir -replace '\\', '/'
+              $xml += "      <Component Id=`"$safeId`" Subdirectory=`"$subDirClean`" Guid=`"*`">`n"
+              $xml += "        <File Source=`"`$(var.PublishDir)\$relativePath`" />`n"
+              $xml += "      </Component>`n"
+            }
             $componentId++
           }
 

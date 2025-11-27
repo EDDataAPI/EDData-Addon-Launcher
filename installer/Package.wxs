@@ -4,7 +4,7 @@
 
   <Package Name="Elite Dangerous Addon Launcher V2"
            Manufacturer="EDToolbox"
-           Version="!(bind.FileVersion.MainExecutable)"
+           Version="!(bind.FileVersion.MainExeFile)"
            UpgradeCode="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D">
 
     <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
@@ -56,7 +56,7 @@
     </Component>
 
     <!-- Application icon -->
-    <Icon Id="ProductIcon.ico" SourceFile="elite-dangerous-icon.ico" />
+    <Icon Id="ProductIcon.ico" SourceFile="installer\icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico" />
 
     <!-- License -->
