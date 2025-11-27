@@ -1359,6 +1359,158 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
         #endregion Epic Games Detection
 
+        #region Frontier Standalone Detection
+
+        /// <summary>
+        /// Searches for Elite Dangerous Frontier Standalone installation.
+        /// Checks common installation paths and Windows Registry uninstall entries.
+        /// </summary>
+        private static string? FindEliteInFrontierStandalone()
+        {
+            Log.Information("Searching for Frontier Standalone installation...");
+
+            // Common Frontier installation paths
+            var commonPaths = new List<string>
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Frontier", "EDLaunch"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Frontier", "EDLaunch"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Frontier", "Elite Dangerous"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Frontier", "Elite Dangerous"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Frontier_Developments", "Products"),
+                @"C:\Program Files (x86)\Frontier\EDLaunch",
+                @"C:\Program Files\Frontier\EDLaunch",
+                @"D:\Frontier\EDLaunch",
+                @"D:\Games\Frontier\EDLaunch",
+                @"E:\Frontier\EDLaunch",
+                @"E:\Games\Frontier\EDLaunch",
+            };
+
+            // Check common paths first
+            foreach (var basePath in commonPaths)
+            {
+                if (Directory.Exists(basePath))
+                {
+                    var edLaunchPath = Path.Combine(basePath, AppConstants.EdLaunchExe);
+                    if (File.Exists(edLaunchPath))
+                    {
+                        Log.Information("Found Elite Dangerous via Frontier path: {Path}", edLaunchPath);
+                        return edLaunchPath;
+                    }
+
+                    // Search subdirectories (Frontier sometimes uses version folders)
+                    try
+                    {
+                        var found = Directory.GetFiles(basePath, AppConstants.EdLaunchExe, SearchOption.AllDirectories).FirstOrDefault();
+                        if (!string.IsNullOrEmpty(found))
+                        {
+                            Log.Information("Found Elite Dangerous via Frontier subdirectory: {Path}", found);
+                            return found;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "Error searching Frontier directory: {Path}", basePath);
+                    }
+                }
+            }
+
+            // Check Windows Registry for Frontier installations
+            try
+            {
+                var registryPaths = new[]
+                {
+                    @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                    @"SOFTWARE\WOW6432Node\Frontier Developments",
+                    @"SOFTWARE\Frontier Developments"
+                };
+
+                foreach (var regPath in registryPaths)
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(regPath);
+                    if (key == null) continue;
+
+                    foreach (var subKeyName in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(subKeyName);
+                            var displayName = subKey?.GetValue("DisplayName")?.ToString();
+                            var installLocation = subKey?.GetValue("InstallLocation")?.ToString();
+
+                            if (!string.IsNullOrEmpty(displayName) &&
+                                displayName.Contains("Elite", StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrEmpty(installLocation) &&
+                                Directory.Exists(installLocation))
+                            {
+                                var edLaunchPath = Path.Combine(installLocation, AppConstants.EdLaunchExe);
+                                if (File.Exists(edLaunchPath))
+                                {
+                                    Log.Information("Found Elite Dangerous via Registry: {Path}", edLaunchPath);
+                                    return edLaunchPath;
+                                }
+
+                                // Check subdirectories
+                                var subFound = Directory.GetFiles(installLocation, AppConstants.EdLaunchExe, SearchOption.TopDirectoryOnly).FirstOrDefault();
+                                if (!string.IsNullOrEmpty(subFound))
+                                {
+                                    Log.Information("Found Elite Dangerous via Registry subdirectory: {Path}", subFound);
+                                    return subFound;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Skip inaccessible registry keys
+                        }
+                    }
+                }
+
+                // Also check HKCU for user-specific installations
+                foreach (var regPath in new[] { @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" })
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(regPath);
+                    if (key == null) continue;
+
+                    foreach (var subKeyName in key.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(subKeyName);
+                            var displayName = subKey?.GetValue("DisplayName")?.ToString();
+                            var installLocation = subKey?.GetValue("InstallLocation")?.ToString();
+
+                            if (!string.IsNullOrEmpty(displayName) &&
+                                displayName.Contains("Elite", StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrEmpty(installLocation) &&
+                                Directory.Exists(installLocation))
+                            {
+                                var edLaunchPath = Path.Combine(installLocation, AppConstants.EdLaunchExe);
+                                if (File.Exists(edLaunchPath))
+                                {
+                                    Log.Information("Found Elite Dangerous via User Registry: {Path}", edLaunchPath);
+                                    return edLaunchPath;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Skip inaccessible registry keys
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Error searching Windows Registry for Elite Dangerous");
+            }
+
+            Log.Information("Elite Dangerous not found via Frontier Standalone detection");
+            return null;
+        }
+
+        #endregion Frontier Standalone Detection
+
         public static async Task<List<string>> ScanComputerForEdLaunch()
         {
             List<string> foundPaths = new List<string>();
@@ -1383,8 +1535,18 @@ namespace Elite_Dangerous_Addon_Launcher_V2
                 return foundPaths;
             }
 
-            // Both failed, fall back to full scan
-            Log.Information("Steam and Epic detection failed, starting full disk scan...");
+            // Third, try Frontier Standalone detection (fast)
+            Log.Information("Attempting Frontier Standalone detection...");
+            var frontierPath = FindEliteInFrontierStandalone();
+            if (!string.IsNullOrEmpty(frontierPath))
+            {
+                foundPaths.Add(frontierPath);
+                Log.Information("Elite Dangerous found via Frontier Standalone detection: {Path}", frontierPath);
+                return foundPaths;
+            }
+
+            // All fast methods failed, fall back to full scan
+            Log.Information("Steam, Epic, and Frontier detection failed, starting full disk scan...");
             
             string targetFolder = "Elite Dangerous";
             string targetFile = AppConstants.EdLaunchExe;
