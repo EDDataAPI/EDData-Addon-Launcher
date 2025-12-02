@@ -820,8 +820,10 @@ namespace Elite_Dangerous_Addon_Launcher_V2
 
                     string target = app.WebAppURL;
                     // Use using statement for proper resource cleanup (optimization #4)
-                    // UseShellExecute = false for security (Fix #1c)
-                    using (var proc = Process.Start(new ProcessStartInfo(target) { UseShellExecute = false }))
+                    // UseShellExecute = true required for steam:// and other protocol handlers
+                    // UseShellExecute = false only for http/https (security consideration)
+                    bool useShell = !target.StartsWith("http", StringComparison.OrdinalIgnoreCase);
+                    using (var proc = Process.Start(new ProcessStartInfo(target) { UseShellExecute = useShell }))
                     {
                         // Web app launched
                     }
@@ -2042,8 +2044,8 @@ namespace Elite_Dangerous_Addon_Launcher_V2
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 return false;
 
-            // Only allow http/https for web URLs
-            return uri.Scheme is "http" or "https";
+            // Allow http/https for web URLs, and steam:// for Steam game launches
+            return uri.Scheme is "http" or "https" or "steam";
         }
 
         private bool IsEpicInstalled(string exePath)
